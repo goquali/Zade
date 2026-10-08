@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { auth } from "../lib/auth/server";
+import { getAuthorizedFamilyUser } from "../lib/auth/authorization";
 import { Moon, Milk, Droplets, Thermometer, Heart, TrendingUp, ShieldCheck } from "lucide-react";
 const metrics = [
   { label: "Total sleep", value: "15h 10m", detail: "Last 24 hours", Icon: Moon },
@@ -5,7 +8,11 @@ const metrics = [
   { label: "Diaper changes", value: "8", detail: "Last 24 hours", Icon: Droplets },
   { label: "Nursery temperature", value: "71°F", detail: "Sample reading", Icon: Thermometer }
 ];
-export default function Home() {
+export const dynamic = "force-dynamic";
+export default async function Home() {
+  const { data } = await auth.getSession();
+  if (!data?.user) redirect("/sign-in");
+  if (!(await getAuthorizedFamilyUser())) redirect("/unauthorized");
   return <main className="shell">
     <header className="header"><div><p className="eyebrow">BABY CARE · PRIVATE DASHBOARD</p><h1>Zade <span>♡</span></h1><p className="muted">A calmer way to see the whole picture.</p></div><div className="avatar"><Heart size={24}/></div></header>
     <div className="notice"><ShieldCheck size={18}/><div><strong>Preview mode</strong><p>All numbers are illustrative. No accounts are connected and no real baby data is stored.</p></div></div>
