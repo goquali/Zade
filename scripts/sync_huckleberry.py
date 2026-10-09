@@ -15,6 +15,13 @@ def serialize(value):
         return {str(k): serialize(v) for k, v in value.items()}
     return value
 
+def child_name(child):
+    for key in ("name", "firstName", "nickname"):
+        value = getattr(child, key, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
 async def main():
     required = ["HUCKLEBERRY_EMAIL", "HUCKLEBERRY_PASSWORD", "ZADE_SYNC_URL", "ZADE_SYNC_TOKEN"]
     missing = [key for key in required if not os.getenv(key)]
@@ -31,15 +38,22 @@ async def main():
         user = await api.get_user()
         children = list(user.childList)
         selected = os.getenv("HUCKLEBERRY_CHILD_UID")
+        selected_name = os.getenv("HUCKLEBERRY_CHILD_NAME")
         if selected:
             matches = [child for child in children if child.cid == selected]
             if len(matches) != 1:
                 raise RuntimeError("Configured child UID not found.")
             child = matches[0]
+        elif selected_name:
+            normalized = selected_name.strip().casefold()
+            matches = [child for child in children if child_name(child) and child_name(child).casefold() == normalized]
+            if len(matches) != 1:
+                raise RuntimeError("Configured child name did not uniquely match a Huckleberry profile.")
+            child = matches[0]
         elif len(children) == 1:
             child = children[0]
         else:
-            raise RuntimeError("Multiple child profiles found. Set HUCKLEBERRY_CHILD_UID to prevent mixing records.")
+            raise RuntimeError("Multiple child profiles found. Set HUCKLEBERRY_CHILD_NAME or HUCKLEBERRY_CHILD_UID to prevent mixing records.")
         sleep = await api.get_sleep(child.cid)
         nursing = await api.get_nursing(child.cid)
         growth = await api.get_latest_growth(child.cid)

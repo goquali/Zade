@@ -34,6 +34,7 @@ jobs:
           HUCKLEBERRY_EMAIL: ${{ secrets.HUCKLEBERRY_EMAIL }}
           HUCKLEBERRY_PASSWORD: ${{ secrets.HUCKLEBERRY_PASSWORD }}
           HUCKLEBERRY_CHILD_UID: ${{ secrets.HUCKLEBERRY_CHILD_UID }}
+          HUCKLEBERRY_CHILD_NAME: ${{ secrets.HUCKLEBERRY_CHILD_NAME }}
           ZADE_SYNC_URL: ${{ secrets.ZADE_SYNC_URL }}
           ZADE_SYNC_TOKEN: ${{ secrets.ZADE_SYNC_TOKEN }}
           VERCEL_OIDC_TOKEN: ${{ steps.vercel_oidc.outputs.token }}
