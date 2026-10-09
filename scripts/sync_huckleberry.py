@@ -51,10 +51,13 @@ async def main():
             "nursing": serialize(nursing),
             "growth": serialize(growth),
         }
+        headers = {"Authorization": "Bearer " + os.environ["ZADE_SYNC_TOKEN"]}
+        if os.getenv("VERCEL_OIDC_TOKEN"):
+            headers["x-vercel-trusted-oidc-idp-token"] = os.environ["VERCEL_OIDC_TOKEN"]
         async with session.post(
             os.environ["ZADE_SYNC_URL"].rstrip("/") + "/api/integrations/huckleberry",
             json=snapshot,
-            headers={"Authorization": "Bearer " + os.environ["ZADE_SYNC_TOKEN"]},
+            headers=headers,
             timeout=aiohttp.ClientTimeout(total=30),
         ) as response:
             if response.status != 200:
