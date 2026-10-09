@@ -1,0 +1,70 @@
+name: Huckleberry read-only sync
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/neon-family-auth]
+    paths:
+      - ".github/workflows/huckleberry-sync.yml"
+      - "scripts/sync_huckleberry.py"
+      - "scripts/requirements-huckleberry.txt"
+      - "scripts/test_sync_huckleberry.py"
+      - "proxy.ts"
+      - "app/api/integrations/huckleberry/route.ts"
+  schedule:
+    - cron: "*/15 * * * *"
+permissions:
+  contents: read
+  id-token: write
+  statuses: read
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: huckleberry-sync-preview
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r scripts/requirements-huckleberry.txt
+      - run: python -m pip check
+      - run: python -m unittest discover -s scripts -p 'test_*.py'
+      - name: Wait for this commit's Vercel deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deadline = Date.now() + 5 * 60 * 1000;
+            while (Date.now() < deadline) {
+              const { data } = await github.rest.repos.getCombinedStatusForRef({
+                ...context.repo, ref: context.sha
+              });
+              const deployment = data.statuses.find(s => s.context === 'Vercel');
+              if (deployment?.state === 'success') return;
+              if (['failure', 'error'].includes(deployment?.state)) {
+                throw new Error('Vercel deployment failed; sync was not attempted.');
+              }
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+            throw new Error('Vercel deployment is not ready; sync was not attempted.');
+      - name: Request GitHub OIDC token for protected Vercel preview
+        id: vercel_oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Vercel trusts the linked GitHub repository's default audience.
+            // Never substitute a stored Vercel token or audience="vercel".
+            const token = await core.getIDToken();
+            core.setSecret(token);
+            core.setOutput('token', token);
+      - run: python scripts/sync_huckleberry.py
+        env:
+          HUCKLEBERRY_EMAIL: ${{ secrets.HUCKLEBERRY_EMAIL }}
+          HUCKLEBERRY_PASSWORD: ${{ secrets.HUCKLEBERRY_PASSWORD }}
+          HUCKLEBERRY_CHILD_UID: ${{ secrets.HUCKLEBERRY_CHILD_UID }}
+          HUCKLEBERRY_CHILD_NAME: ${{ secrets.HUCKLEBERRY_CHILD_NAME }}
+          # Use the protected branch alias, not an old immutable deployment URL.
+          ZADE_SYNC_URL: https://zade-git-feature-neon-family-auth-goqualis-projects.vercel.app
+          ZADE_SYNC_TOKEN: ${{ secrets.ZADE_SYNC_TOKEN }}
+          VERCEL_OIDC_TOKEN: ${{ steps.vercel_oidc.outputs.token }}
