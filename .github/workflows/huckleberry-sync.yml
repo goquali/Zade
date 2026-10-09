@@ -64,6 +64,7 @@ jobs:
           HUCKLEBERRY_PASSWORD: ${{ secrets.HUCKLEBERRY_PASSWORD }}
           HUCKLEBERRY_CHILD_UID: ${{ secrets.HUCKLEBERRY_CHILD_UID }}
           HUCKLEBERRY_CHILD_NAME: ${{ secrets.HUCKLEBERRY_CHILD_NAME }}
-          ZADE_SYNC_URL: ${{ secrets.ZADE_SYNC_URL }}
+          # Use the protected branch alias, not an old immutable deployment URL.
+          ZADE_SYNC_URL: https://zade-git-feature-neon-family-auth-goqualis-projects.vercel.app
           ZADE_SYNC_TOKEN: ${{ secrets.ZADE_SYNC_TOKEN }}
           VERCEL_OIDC_TOKEN: ${{ steps.vercel_oidc.outputs.token }}

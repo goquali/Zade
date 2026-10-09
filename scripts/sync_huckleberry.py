@@ -64,6 +64,11 @@ def response_failure(status, headers):
             return "Application sync configuration is unavailable. Check ZADE_SYNC_TOKEN (32+ characters) and DATABASE_URL."
         return "Application Huckleberry endpoint rejected the request (HTTP " + str(status) + ")."
     if status in (301, 302, 303, 307, 308):
+        path = urlsplit(headers.get("Location", "")).path
+        if path.rstrip("/") == "/sign-in":
+            return "Neon Auth redirected the request to sign-in. The target deployment must contain the exact sync endpoint proxy exclusion."
+        if path.startswith("/sso-api") or path.startswith("/login"):
+            return "Vercel Deployment Protection redirected the request to login. Check the linked GitHub repository and OIDC trust."
         return "Request redirected before reaching the sync endpoint. Check Neon Auth proxy exclusions and the deployment URL."
     if status in (401, 403):
         return "Request rejected before reaching the sync endpoint (HTTP " + str(status) + "). Check Vercel Deployment Protection, the linked GitHub repository, and the fresh GitHub OIDC token."

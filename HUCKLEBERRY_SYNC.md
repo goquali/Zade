@@ -20,9 +20,11 @@ Keep Vercel Authentication enabled. Only the exact
 the route authenticates every GET and POST itself. The dashboard and other
 APIs keep their session and family authorization checks.
 
-Set `ZADE_SYNC_URL` to the current protected deployment origin or full sync
-endpoint. Prefer the branch alias so new deployments use refreshed environment
-variables. Requests reject redirects to avoid forwarding credentials or
+The workflow sets `ZADE_SYNC_URL` to the protected `feature/neon-family-auth`
+branch alias, so new deployments use the fixes and refreshed environment
+variables. It no longer uses the old GitHub URL secret, which may refer to an
+immutable deployment. For local runs, use an HTTPS origin or full endpoint.
+Requests reject redirects to avoid forwarding credentials or
 mistaking a sign-in page for a successful sync.
 
 Before reading Huckleberry, the script performs an authenticated GET. Its
