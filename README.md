@@ -5,7 +5,7 @@ Private baby dashboard project for Huckleberry and Nanit insights.
 ## Status
 
 Huckleberry snapshots are stored in Neon and displayed only to signed-in,
-approved family accounts. The dashboard shows the latest saved sleep, nursing,
+approved family accounts. The dashboard shows the latest saved bottle, sleep, nursing,
 and growth entries, the last successful sync time, and stale or unavailable
 data states. Nanit is not connected.
 

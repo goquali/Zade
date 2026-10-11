@@ -18,7 +18,7 @@ const view = load("lib/integrations/huckleberry-view.ts");
 const fixture = {
   source:"huckleberry", childId:"fixture-private-id",
   sleep:{prefs:{lastSleep:{start:1791676800, duration:5400}}, timer:{active:true,paused:true,timerStartTime:1791676800000}},
-  nursing:{prefs:{lastNursing:{start:1791676800,leftDuration:300,rightDuration:420}},timer:{active:true,paused:false,feedStartTime:1791676800}},
+  nursing:{prefs:{lastBottle:{start:1791676800,bottleAmount:120,bottleUnits:"ml",bottleType:"Formula"},lastNursing:{start:1791676800,leftDuration:300,rightDuration:420}},timer:{active:true,paused:false,feedStartTime:1791676800}},
   growth:{start:1791676800,weight:4.2,weightUnits:"kg",height:55,heightUnits:"cm",head:37,headUnits:"hcm"},
 };
 test("maps API seconds, sleep timer milliseconds, side durations and metric units", () => {
@@ -31,6 +31,23 @@ test("maps API seconds, sleep timer milliseconds, side durations and metric unit
   assert.equal(data.growth.weight,"4.2 kg");
   assert.equal(data.growth.height,"55 cm");
   assert.equal(data.growth.head,"37 cm");
+});
+test("bottle feeds preserve units and do not substitute defaults for missing records", () => {
+  const bottle = view.normalizeHuckleberry(fixture).bottle;
+  assert.equal(bottle.amount,"120 mL");
+  assert.equal(bottle.type,"Formula");
+  assert.equal(bottle.recordedAt,view.normalizeHuckleberry(fixture).nursing.startedAt);
+  const normalize = lastBottle => view.normalizeHuckleberry({nursing:{prefs:{lastBottle}}}).bottle;
+  assert.equal(normalize({bottleAmount:4.5,bottleUnits:"oz"}).amount,"4.5 oz");
+  assert.equal(normalize({bottleAmount:0,bottleUnits:"ml"}).amount,"0 mL");
+  for(const bottle of [{}, {bottleAmount:-1,bottleUnits:"ml"}, {bottleAmount:"120",bottleUnits:"ml"},
+    {bottleAmount:120,bottleUnits:"unknown"}, {bottleAmount:120,bottleUnits:"__proto__"}]) {
+    assert.equal(normalize(bottle).amount,null);
+  }
+  const defaults = view.normalizeHuckleberry({nursing:{prefs:{bottleAmount:120,bottleUnits:"ml",bottleType:"Formula"}}}).bottle;
+  assert.equal(defaults.recordedAt,null);
+  assert.equal(defaults.amount,null);
+  assert.equal(defaults.type,null);
 });
 test("missing, invalid and partial records remain missing instead of invented zero totals", () => {
   for (const payload of [null,{}, {sleep:null,nursing:null,growth:null}]) {
@@ -87,7 +104,7 @@ test("storage returns normalized data and database timestamp, with stale status"
 const Dashboard=load("app/components/huckleberry-dashboard.tsx",{"../../lib/integrations/huckleberry-view":view}).default;
 test("dashboard renders saved data and timestamp without sample totals or child IDs",()=>{
   const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture)}}));
-  for(const text of ["1h 30m","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
+  for(const text of ["120 mL","Formula","Last recorded bottle feed","1h 30m","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
   for(const text of ["510","15h 10m","Sample data","fixture-private-id"])assert.ok(!markup.includes(text));
 });
 test("dashboard renders missing measurements, empty storage, outage and stale warnings",()=>{
@@ -97,8 +114,16 @@ test("dashboard renders missing measurements, empty storage, outage and stale wa
   const html=render({state:"ready",syncedAt:"2020-01-01T00:00:00Z",stale:true,data:view.normalizeHuckleberry(null)});
   assert.match(html,/No completed sleep record available/);
   assert.match(html,/No completed nursing record available/);
+  assert.match(html,/No bottle feed record available/);
   assert.match(html,/Not recorded/);
   assert.match(html,/over an hour old/);
+});
+test("a bottle feed with no volume retains its recorded time and milk type",()=>{
+  const data = view.normalizeHuckleberry({nursing:{prefs:{lastBottle:{start:1791676800,bottleUnits:"ml",bottleType:"Breast Milk"}}}});
+  const html = renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data}}));
+  assert.match(html,/Amount not recorded/);
+  assert.match(html,/Breast Milk/);
+  assert.match(html,/Last recorded bottle feed/);
 });
 test("page redirects unauthenticated and unapproved users before reading data",async()=>{
   for(const [session,approved,target] of [[null,false,"/sign-in"],[{user:{email:"fixture@example.invalid"}},false,"/unauthorized"]]){

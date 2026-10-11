@@ -22,6 +22,11 @@ export default function HuckleberryDashboard({snapshot}: {snapshot:HuckleberryDa
     </section>
     <section><div className="sectionHead"><h2>Latest care</h2><span>Pacific time</span></div>
       <div className="grid">
+        <article className="metric" aria-label="Bottle feeding"><div className="metricTop"><Milk size={20}/><h3>Bottle</h3></div>
+          {data.bottle.recordedAt ? <><p className="entry-label">Last recorded bottle feed</p><strong>{data.bottle.amount ?? "Amount not recorded"}</strong>
+            <small>Recorded <RecordedTime value={data.bottle.recordedAt}/></small>
+            <dl className="details"><div><dt>Milk type</dt><dd>{data.bottle.type ?? "Not recorded"}</dd></div></dl></> : <p className="empty">No bottle feed record available.</p>}
+        </article>
         <article className="metric"><div className="metricTop"><Moon size={20}/><h3>Sleep</h3></div>
           {data.sleep.startedAt ? <><p className="entry-label">Last recorded sleep</p><strong>{data.sleep.duration ?? "Duration not recorded"}</strong>
             <small>Started <RecordedTime value={data.sleep.startedAt}/></small></> : <p className="empty">No completed sleep record available.</p>}

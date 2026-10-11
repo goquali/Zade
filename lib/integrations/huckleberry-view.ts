@@ -18,9 +18,9 @@ function duration(value: unknown): string | null {
   const minutes = Math.floor(seconds / 60);
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes} min`;
 }
-function measurement(value: unknown, units: unknown, allowed: Record<string, string>): string | null {
+function measurement(value: unknown, units: unknown, allowed: Record<string, string>, allowZero = false): string | null {
   const n = number(value);
-  if (n === null || n === 0 || typeof units !== "string" || !allowed[units]) return null;
+  if (n === null || (!allowZero && n === 0) || typeof units !== "string" || !Object.hasOwn(allowed, units)) return null;
   return `${n.toLocaleString("en-US", {maximumFractionDigits: 3})} ${allowed[units]}`;
 }
 function timer(value: unknown, sleep: boolean) {
@@ -36,6 +36,8 @@ export function normalizeHuckleberry(payload: unknown) {
   const sleep = document(data.sleep), nursing = document(data.nursing), growth = document(data.growth);
   const lastSleep = document(document(sleep.prefs).lastSleep);
   const lastNursing = document(document(nursing.prefs).lastNursing);
+  const lastBottle = document(document(nursing.prefs).lastBottle);
+  const bottleTypes = ["Breast Milk", "Formula", "Tube Feeding", "Cow Milk", "Goat Milk", "Soy Milk", "Other"];
   const left = number(lastNursing.leftDuration), right = number(lastNursing.rightDuration);
   // A missing side is not zero; timer values are not a completed session.
   const nursingDuration = number(lastNursing.duration) ??
@@ -44,6 +46,9 @@ export function normalizeHuckleberry(payload: unknown) {
     sleep: {startedAt: timestamp(lastSleep.start), duration: duration(lastSleep.duration), timer: timer(sleep.timer, true)},
     nursing: {startedAt: timestamp(lastNursing.start), duration: duration(nursingDuration),
       left: duration(left), right: duration(right), timer: timer(nursing.timer, false)},
+    bottle: {recordedAt: timestamp(lastBottle.start),
+      amount: measurement(lastBottle.bottleAmount, lastBottle.bottleUnits, {ml:"mL", oz:"oz"}, true),
+      type: typeof lastBottle.bottleType === "string" && bottleTypes.includes(lastBottle.bottleType) ? lastBottle.bottleType : null},
     growth: {measuredAt: timestamp(growth.start),
       weight: measurement(growth.weight, growth.weightUnits, {kg:"kg", "lbs.oz":"lb"}),
       height: measurement(growth.height, growth.heightUnits, {cm:"cm", "ft.in":"in"}),
