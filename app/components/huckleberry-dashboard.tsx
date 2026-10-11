@@ -1,3 +1,4 @@
+import DailyCare from "./daily-care";
 import { Moon, Milk, Ruler, RefreshCw, ShieldCheck } from "lucide-react";
 import { formatRecordedTime, type HuckleberryDashboard } from "../../lib/integrations/huckleberry-view";
 
@@ -20,6 +21,7 @@ export default function HuckleberryDashboard({snapshot}: {snapshot:HuckleberryDa
       <p>Last successful sync: <RecordedTime value={snapshot.syncedAt}/></p>
       {snapshot.stale && <p className="stale" role="status">Sync is over an hour old. Showing the last saved information.</p>}</div>
     </section>
+    <DailyCare {...data.history} historyAvailable={data.history.available}/>
     <section><div className="sectionHead"><h2>Latest care</h2><span>Pacific time</span></div>
       <div className="grid">
         <article className="metric" aria-label="Bottle feeding"><div className="metricTop"><Milk size={20}/><h3>Bottle</h3></div>
@@ -44,6 +46,6 @@ export default function HuckleberryDashboard({snapshot}: {snapshot:HuckleberryDa
       {data.growth.measuredAt ? <p className="muted">Latest measurement: <RecordedTime value={data.growth.measuredAt}/></p> : <p className="empty">No growth measurement date available.</p>}
       <div className="growth-grid">{[["Weight",data.growth.weight],["Length / height",data.growth.height],["Head circumference",data.growth.head]].map(([label,value])=><article className="metric" key={label}><h3>{label}</h3><strong>{value ?? "Not recorded"}</strong></article>)}</div>
     </section>
-    <p className="muted data-note">Latest saved entries only. Daily totals and history are not yet available.</p>
+    <p className="muted data-note">Daily totals come from recent Huckleberry history. This dashboard does not replace advice from Zade’s care team.</p>
   </>;
 }
