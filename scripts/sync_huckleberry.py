@@ -2,7 +2,7 @@
 import asyncio
 import os
 from urllib.parse import urlsplit, urlunsplit
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 from huckleberry_api import HuckleberryAPI
 
@@ -123,6 +123,14 @@ async def main():
         sleep = await api.get_sleep(child.cid)
         nursing = await api.get_nursing(child.cid)
         growth = await api.get_latest_growth(child.cid)
+        # Retrieve recent intervals using Pacific-local calendar boundaries.
+        from zoneinfo import ZoneInfo
+        pacific = ZoneInfo("America/Los_Angeles")
+        tomorrow = datetime.now(pacific).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        week_start = tomorrow - timedelta(days=8)
+        feeds = await api.list_feed_intervals(child.cid, week_start, tomorrow)
+        diapers = await api.list_diaper_intervals(child.cid, week_start, tomorrow)
+        sleeps = await api.list_sleep_intervals(child.cid, week_start, tomorrow)
         snapshot = {
             "source": "huckleberry",
             "childId": child.cid,
@@ -130,6 +138,9 @@ async def main():
             "sleep": serialize(sleep),
             "nursing": serialize(nursing),
             "growth": serialize(growth),
+            "feedIntervals": serialize(feeds),
+            "diaperIntervals": serialize(diapers),
+            "sleepIntervals": serialize(sleeps),
         }
         async with session.post(
             endpoint,
