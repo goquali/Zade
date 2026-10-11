@@ -42,7 +42,44 @@ export function normalizeHuckleberry(payload: unknown) {
   // A missing side is not zero; timer values are not a completed session.
   const nursingDuration = number(lastNursing.duration) ??
     (left !== null && right !== null ? left + right : null);
+
+  // Historical intervals are optional for older snapshots; never infer zero
+  // intake from an absent or partially populated history.
+  const feedRows = Array.isArray(data.feedIntervals) ? data.feedIntervals : null;
+  const diaperRows = Array.isArray(data.diaperIntervals) ? data.diaperIntervals : null;
+  const sleepRows = Array.isArray(data.sleepIntervals) ? data.sleepIntervals : null;
+  const dateKey = (iso: string) => new Intl.DateTimeFormat("en-CA", {
+    timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"
+  }).format(new Date(iso));
+  const today = dateKey(new Date().toISOString());
+  const feedEvents = (feedRows ?? []).flatMap((raw) => {
+    const e = document(raw), at = timestamp(e.start);
+    if (!at) return [];
+    const amount = number(e.amount);
+    const units = e.units === "oz" ? "oz" : e.units === "ml" ? "ml" : null;
+    const ml = amount !== null && units ? (units === "oz" ? amount * 29.5735295625 : amount) : null;
+    return [{at,kind:e.mode === "bottle" ? "Bottle" : e.mode === "breast" ? "Nursing" : "Feeding",
+      volumeMl:e.mode === "bottle" ? ml : null,description:e.mode === "bottle"
+        ? (ml !== null ? Math.round(ml) + " mL " + (e.bottleType ?? "bottle") : "Bottle · volume unavailable")
+        : e.mode === "breast" ? "Nursing session" : "Feeding"}];
+  });
+  const diaperEvents = (diaperRows ?? []).flatMap(raw => {
+    const e=document(raw),at=timestamp(e.start);
+    return at ? [{at,kind:"Diaper",volumeMl:null,description:"Diaper · " + (typeof e.mode === "string" ? e.mode : "recorded")}] : [];
+  });
+  const sleepEvents = (sleepRows ?? []).flatMap(raw => {
+    const e=document(raw),at=timestamp(e.start);
+    return at ? [{at,kind:"Sleep",volumeMl:null,description:"Sleep · " + (duration(e.duration) ?? "duration unavailable")}] : [];
+  });
+  const events = [...feedEvents,...diaperEvents,...sleepEvents].sort((a,b)=>b.at.localeCompare(a.at));
+  const todaysBottles = feedEvents.filter(e=>e.kind==="Bottle" && dateKey(e.at)===today);
+  const completeBottleVolumes = todaysBottles.every(e=>e.volumeMl !== null);
+  const todaysMl = feedRows !== null && completeBottleVolumes
+    ? Math.round(todaysBottles.reduce((sum,e)=>sum+(e.volumeMl ?? 0),0)) : null;
+  const todaysDiapers = diaperRows === null ? null :
+    diaperEvents.filter(e=>dateKey(e.at)===today).length;
   return {
+    history: {events: events.slice(0,80), todaysMl, todaysBottles:todaysBottles.length, todaysDiapers, available: feedRows !== null && diaperRows !== null},
     sleep: {startedAt: timestamp(lastSleep.start), duration: duration(lastSleep.duration), timer: timer(sleep.timer, true)},
     nursing: {startedAt: timestamp(lastNursing.start), duration: duration(nursingDuration),
       left: duration(left), right: duration(right), timer: timer(nursing.timer, false)},
