@@ -98,6 +98,8 @@ async def main():
         headers["x-vercel-trusted-oidc-idp-token"] = os.environ["VERCEL_OIDC_TOKEN"]
     elif os.getenv("GITHUB_ACTIONS") == "true":
         raise RuntimeError("GitHub Actions requires a fresh VERCEL_OIDC_TOKEN for Deployment Protection.")
+    if os.getenv("VERCEL_AUTOMATION_BYPASS_SECRET"):
+        headers["x-vercel-protection-bypass"] = os.environ["VERCEL_AUTOMATION_BYPASS_SECRET"]
     async with aiohttp.ClientSession() as session:
         # Verify protection access and token agreement before reading baby data.
         async with session.get(endpoint, headers=headers, allow_redirects=False,
