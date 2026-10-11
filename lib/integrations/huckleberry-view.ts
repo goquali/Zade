@@ -48,9 +48,11 @@ export function normalizeHuckleberry(payload: unknown) {
   const feedRows = Array.isArray(data.feedIntervals) ? data.feedIntervals : null;
   const diaperRows = Array.isArray(data.diaperIntervals) ? data.diaperIntervals : null;
   const sleepRows = Array.isArray(data.sleepIntervals) ? data.sleepIntervals : null;
-  const dateKey = (iso: string) => new Intl.DateTimeFormat("en-CA", {
-    timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"
-  }).format(new Date(iso));
+  const dateKey = (iso: string) => {
+    const parts = new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(iso));
+    const pick = (type:string) => parts.find(p=>p.type===type)?.value ?? "";
+    return pick("year")+"-"+pick("month")+"-"+pick("day");
+  };
   const today = dateKey(new Date().toISOString());
   const feedEvents = (feedRows ?? []).flatMap((raw) => {
     const e = document(raw), at = timestamp(e.start);
