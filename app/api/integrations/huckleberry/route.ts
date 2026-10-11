@@ -29,17 +29,20 @@ export async function GET(req: NextRequest) {
         payload->>'source' AS source,
         jsonb_typeof(payload->'sleep') AS sleep_type,
         jsonb_typeof(payload->'nursing') AS nursing_type,
-        jsonb_typeof(payload->'growth') AS growth_type
+        jsonb_typeof(payload->'growth') AS growth_type,
+        jsonb_typeof(payload->'history') AS history_type
         FROM integration_snapshots WHERE provider='huckleberry' LIMIT 1`;
       const row = rows[0];
       const view = row ? normalizeHuckleberry(row.payload) : null;
       return NextResponse.json({ok:true, stored:!!row,
         syncedAt:row ? new Date(row.synced_at).toISOString() : null,
         sourceVerified:row?.source === "huckleberry",
-        documents:row ? {sleep:row.sleep_type, nursing:row.nursing_type, growth:row.growth_type} : null,
+        documents:row ? {sleep:row.sleep_type, nursing:row.nursing_type, growth:row.growth_type, history:row.history_type} : null,
         displayAvailable:view ? {
           sleep:!!view.sleep.startedAt, nursing:!!view.nursing.startedAt,
-          weight:!!view.growth.weight, height:!!view.growth.height, head:!!view.growth.head
+          weight:!!view.growth.weight, height:!!view.growth.height, head:!!view.growth.head,
+          bottleHistory:view.executive.milk.historyAvailable,
+          diaperHistory:view.executive.diaper.historyAvailable
         } : null
       }, {headers:syncHeaders});
     } catch {
@@ -61,10 +64,14 @@ export async function POST(req: NextRequest) {
   // The Python API returns null when a child has no sleep/feed document yet.
   const validDocument = (value: unknown) => value === null ||
     (typeof value === "object" && !Array.isArray(value));
+  const validHistory = (value: unknown) => value === undefined ||
+    (typeof value === "object" && value !== null && !Array.isArray(value) &&
+      Array.isArray((value as Record<string, unknown>).feed) &&
+      Array.isArray((value as Record<string, unknown>).diaper));
   if (data.source !== "huckleberry" || typeof data.childId !== "string" || !data.childId || data.childId.length > 200 ||
       typeof data.syncedAt !== "string" || !Number.isFinite(Date.parse(data.syncedAt)) ||
       !("sleep" in data) || !("nursing" in data) ||
-      !validDocument(data.sleep) || !validDocument(data.nursing))
+      !validDocument(data.sleep) || !validDocument(data.nursing) || !validHistory(data.history))
     return NextResponse.json({error:"Invalid snapshot"}, {status:400});
   const sql = neon(database);
   await sql`CREATE TABLE IF NOT EXISTS integration_snapshots (

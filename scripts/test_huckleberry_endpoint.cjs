@@ -81,8 +81,9 @@ test("missing configuration fails closed", async () => {
 
 test("storage verification is authenticated, read-only and never returns record values", async () => {
   const {route,queries} = loadRoute(env,[{synced_at:"2026-10-11T14:00:00Z", source:"huckleberry",
-    sleep_type:"object", nursing_type:"object", growth_type:"object",
-    payload:{childId:"private-fixture-id",sleep:{prefs:{lastSleep:{start:1791676800,duration:5400}}},growth:{weight:4.123,weightUnits:"kg"}}}]);
+    sleep_type:"object", nursing_type:"object", growth_type:"object", history_type:"object",
+    payload:{childId:"private-fixture-id",sleep:{prefs:{lastSleep:{start:1791676800,duration:5400}}},
+      growth:{weight:4.123,weightUnits:"kg"},history:{feedAvailable:true,diaperAvailable:true,feed:[],diaper:[]}}}]);
   const req = authorization => new NextRequest("https://example.invalid/api/integrations/huckleberry?verify=storage",{headers:authorization?{authorization}:{}});
   assert.equal((await route.GET(req())).status,401);
   assert.equal(queries(),0);
@@ -93,6 +94,8 @@ test("storage verification is authenticated, read-only and never returns record 
   assert.equal(body.displayAvailable.sleep,true);
   assert.equal(body.displayAvailable.nursing,false);
   assert.equal(body.displayAvailable.weight,true);
+  assert.equal(body.displayAvailable.bottleHistory,true);
+  assert.equal(body.displayAvailable.diaperHistory,true);
   assert.equal(JSON.stringify(body).includes("4.123"),false);
   assert.equal(JSON.stringify(body).includes("private-fixture-id"),false);
   assert.equal(queries(),1);
@@ -101,10 +104,11 @@ test("storage verification is authenticated, read-only and never returns record 
 
 test("valid snapshots support absent Huckleberry documents; malformed snapshots do not write", async () => {
   const snapshot = { source: "huckleberry", childId: "fixture-child",
-    syncedAt: "2026-10-09T00:00:00Z", sleep: null, nursing: null, growth: null };
+    syncedAt: "2026-10-09T00:00:00Z", sleep: null, nursing: null, growth: null,
+    history:{feedAvailable:true,diaperAvailable:true,feed:[],diaper:[]} };
   const { route, queries } = loadRoute(env);
   for (const body of [{ ...snapshot, syncedAt: "invalid" }, { ...snapshot, childId: "" },
-                      { ...snapshot, sleep: [] }, { source: "huckleberry" }]) {
+                      { ...snapshot, sleep: [] }, { ...snapshot, history:{feed:{}} }, { source: "huckleberry" }]) {
     assert.equal((await route.POST(request("POST", "Bearer " + token, body))).status, 400);
   }
   assert.equal(queries(), 0);

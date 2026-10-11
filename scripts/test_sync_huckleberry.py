@@ -3,7 +3,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from huckleberry_api.firebase_types import FirebaseChildDocument, FirebaseUserChildRef
-from sync_huckleberry import check_response, select_child, serialize, sync_endpoint
+from sync_huckleberry import check_response, history_window, select_child, serialize, sync_endpoint
 
 
 class ChildSelectionTests(unittest.IsolatedAsyncioTestCase):
@@ -80,6 +80,28 @@ class ConfigurationTests(unittest.TestCase):
     def test_model_serialization_and_missing_document(self):
         self.assertEqual(serialize({"profile": FirebaseChildDocument(childsName="Example")})["profile"]["childsName"], "Example")
         self.assertIsNone(serialize(None))
+
+
+class HistoryWindowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_supported_history_methods_are_called_without_records_in_logs(self):
+        api = SimpleNamespace(
+            list_feed_intervals=AsyncMock(return_value=[{"mode": "bottle", "start": 1, "amount": 120, "units": "ml"}]),
+            list_diaper_intervals=AsyncMock(return_value=[{"mode": "pee", "start": 2}]),
+        )
+        result = await history_window(api, "child-private-id")
+        self.assertTrue(result["feedAvailable"])
+        self.assertTrue(result["diaperAvailable"])
+        self.assertEqual(result["feed"][0]["mode"], "bottle")
+        self.assertIn("rangeStart", result)
+        api.list_feed_intervals.assert_awaited_once()
+        api.list_diaper_intervals.assert_awaited_once()
+
+    async def test_missing_history_methods_are_explicitly_unavailable(self):
+        result = await history_window(SimpleNamespace(), "child-private-id")
+        self.assertFalse(result["feedAvailable"])
+        self.assertFalse(result["diaperAvailable"])
+        self.assertEqual(result["feed"], [])
+        self.assertEqual(result["diaper"], [])
 
 
 if __name__ == "__main__":

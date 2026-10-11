@@ -32,6 +32,14 @@ success proves that Deployment Protection was passed and that the runner's token
 matches the deployed token. It returns no records, token values, or fingerprints
 and performs no database query. POST then validates and upserts the snapshot.
 
+The saved snapshot includes the latest sleep/feed/growth documents plus a
+30-hour read-only history window from the pinned `huckleberry-api==0.4.7`
+Firestore methods `list_feed_intervals(child_uid, start_time, end_time)` and
+`list_diaper_intervals(child_uid, start_time, end_time)`. The dashboard uses
+those event rows for rolling bottle intake and pee/poop freshness. If history
+methods are not available, the snapshot marks feed or diaper history unavailable;
+the dashboard does not invent event totals from latest-summary fields.
+
 Failure diagnostics distinguish an application token 401 using
 `x-zade-auth-layer: sync-token`, a redirect from middleware or routing, and a
 401/403 before the application from Deployment Protection. No raw response bodies

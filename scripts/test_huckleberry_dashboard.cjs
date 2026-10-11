@@ -20,7 +20,17 @@ const fixture = {
   sleep:{prefs:{lastSleep:{start:1791676800, duration:5400}}, timer:{active:true,paused:true,timerStartTime:1791676800000}},
   nursing:{prefs:{lastBottle:{start:1791676800,bottleAmount:120,bottleUnits:"ml",bottleType:"Formula"},lastNursing:{start:1791676800,leftDuration:300,rightDuration:420}},timer:{active:true,paused:false,feedStartTime:1791676800}},
   growth:{start:1791676800,weight:4.2,weightUnits:"kg",height:55,heightUnits:"cm",head:37,headUnits:"hcm"},
+  history:{feedAvailable:true,diaperAvailable:true,feed:[
+    {mode:"bottle",start:1791676800,amount:120,units:"ml",bottleType:"Formula"},
+    {mode:"bottle",start:1791759600,amount:2,units:"oz",bottleType:"Breast Milk"},
+    {mode:"breast",start:1791761000}
+  ],diaper:[
+    {mode:"pee",start:1791756000},
+    {mode:"poo",start:1791738000},
+    {mode:"both",start:1791761400}
+  ]},
 };
+const fixedNow = new Date((1791676800 + 24 * 60 * 60) * 1000);
 test("maps API seconds, sleep timer milliseconds, side durations and metric units", () => {
   const data = view.normalizeHuckleberry(fixture);
   assert.equal(data.sleep.duration,"1h 30m");
@@ -48,6 +58,27 @@ test("bottle feeds preserve units and do not substitute defaults for missing rec
   assert.equal(defaults.recordedAt,null);
   assert.equal(defaults.amount,null);
   assert.equal(defaults.type,null);
+});
+test("executive dashboard metrics use event history, projection math and stale diaper windows", () => {
+  const data = view.normalizeHuckleberry(fixture, fixedNow);
+  assert.equal(data.executive.weight.actual,"4.2 kg");
+  assert.equal(data.executive.weight.projected,"9.33 lb");
+  assert.equal(data.executive.milk.targetOz,"18.7 oz");
+  assert.equal(data.executive.milk.targetMl,"552 mL");
+  assert.equal(data.executive.milk.actualMl,"179 mL");
+  assert.equal(data.executive.milk.bottleCount,2);
+  assert.equal(data.executive.milk.percent,"32%");
+  assert.equal(data.executive.diaper.pee.state,"fresh");
+  assert.equal(data.executive.diaper.poop.state,"fresh");
+  const stale = view.normalizeHuckleberry({...fixture, history:{...fixture.history, diaper:[{mode:"pee",start:1791716400},{mode:"poo",start:1791712800}]}}, fixedNow);
+  assert.equal(stale.executive.diaper.pee.state,"stale");
+  assert.equal(stale.executive.diaper.poop.state,"stale");
+});
+test("missing event history is reported as unavailable instead of guessed from summaries", () => {
+  const data = view.normalizeHuckleberry({...fixture, history:{feed:[],diaper:[]}}, fixedNow);
+  assert.equal(data.executive.milk.historyAvailable,false);
+  assert.equal(data.executive.milk.actualMl,null);
+  assert.equal(data.executive.diaper.pee.state,"unknown");
 });
 test("missing, invalid and partial records remain missing instead of invented zero totals", () => {
   for (const payload of [null,{}, {sleep:null,nursing:null,growth:null}]) {
@@ -99,12 +130,13 @@ test("storage returns normalized data and database timestamp, with stale status"
   assert.equal(result.stale,true);
   assert.equal(result.syncedAt,"2020-01-01T00:00:00.000Z");
   assert.equal(result.data.sleep.duration,"1h 30m");
+  assert.equal(result.data.executive.milk.historyAvailable,true);
   assert.equal(JSON.stringify(result).includes("fixture-private-id"),false);
 });
 const Dashboard=load("app/components/huckleberry-dashboard.tsx",{"../../lib/integrations/huckleberry-view":view}).default;
 test("dashboard renders saved data and timestamp without sample totals or child IDs",()=>{
-  const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture)}}));
-  for(const text of ["120 mL","Formula","Last recorded bottle feed","1h 30m","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
+  const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture, fixedNow)}}));
+  for(const text of ["179 mL","32%","552 mL","Projected weight","Under 6 hours","Formula","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
   for(const text of ["510","15h 10m","Sample data","fixture-private-id"])assert.ok(!markup.includes(text));
 });
 test("dashboard renders missing measurements, empty storage, outage and stale warnings",()=>{
@@ -112,9 +144,9 @@ test("dashboard renders missing measurements, empty storage, outage and stale wa
   assert.match(render({state:"empty"}),/Waiting for the first sync/);
   assert.match(render({state:"unavailable"}),/Care data unavailable/);
   const html=render({state:"ready",syncedAt:"2020-01-01T00:00:00Z",stale:true,data:view.normalizeHuckleberry(null)});
-  assert.match(html,/No completed sleep record available/);
+  assert.match(html,/Bottle history is unavailable/);
   assert.match(html,/No completed nursing record available/);
-  assert.match(html,/No bottle feed record available/);
+  assert.match(html,/No bottle summary available/);
   assert.match(html,/Not recorded/);
   assert.match(html,/over an hour old/);
 });
@@ -123,7 +155,7 @@ test("a bottle feed with no volume retains its recorded time and milk type",()=>
   const html = renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data}}));
   assert.match(html,/Amount not recorded/);
   assert.match(html,/Breast Milk/);
-  assert.match(html,/Last recorded bottle feed/);
+  assert.match(html,/Last summary bottle feed/);
 });
 test("page redirects unauthenticated and unapproved users before reading data",async()=>{
   for(const [session,approved,target] of [[null,false,"/sign-in"],[{user:{email:"fixture@example.invalid"}},false,"/unauthorized"]]){

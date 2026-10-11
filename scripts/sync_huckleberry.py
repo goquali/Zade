@@ -2,7 +2,8 @@
 import asyncio
 import os
 from urllib.parse import urlsplit, urlunsplit
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import aiohttp
 from huckleberry_api import HuckleberryAPI
 
@@ -21,6 +22,26 @@ def child_name(child):
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+async def history_window(api, child_id):
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(hours=30)
+    result = {
+        "source": "huckleberry-api-0.4.7",
+        "rangeStart": start.isoformat(),
+        "rangeEnd": now.isoformat(),
+        "feedAvailable": False,
+        "diaperAvailable": False,
+        "feed": [],
+        "diaper": [],
+    }
+    if hasattr(api, "list_feed_intervals"):
+        result["feed"] = serialize(await api.list_feed_intervals(child_id, start, now))
+        result["feedAvailable"] = True
+    if hasattr(api, "list_diaper_intervals"):
+        result["diaper"] = serialize(await api.list_diaper_intervals(child_id, start, now))
+        result["diaperAvailable"] = True
+    return result
 
 async def select_child(api, children, selected=None, selected_name=None):
     if not children:
@@ -124,13 +145,13 @@ async def main():
         nursing = await api.get_nursing(child.cid)
         growth = await api.get_latest_growth(child.cid)
         # Retrieve recent intervals using Pacific-local calendar boundaries.
-        from zoneinfo import ZoneInfo
         pacific = ZoneInfo("America/Los_Angeles")
         tomorrow = datetime.now(pacific).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         week_start = tomorrow - timedelta(days=8)
         feeds = await api.list_feed_intervals(child.cid, week_start, tomorrow)
         diapers = await api.list_diaper_intervals(child.cid, week_start, tomorrow)
         sleeps = await api.list_sleep_intervals(child.cid, week_start, tomorrow)
+        history = await history_window(api, child.cid)
         snapshot = {
             "source": "huckleberry",
             "childId": child.cid,
@@ -141,6 +162,7 @@ async def main():
             "feedIntervals": serialize(feeds),
             "diaperIntervals": serialize(diapers),
             "sleepIntervals": serialize(sleeps),
+            "history": history,
         }
         async with session.post(
             endpoint,
