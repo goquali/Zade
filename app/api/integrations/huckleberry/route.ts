@@ -53,9 +53,9 @@ export async function POST(req: NextRequest) {
   if (rejected) return rejected;
   const database = process.env.DATABASE_URL!;
   const length = Number(req.headers.get("content-length") ?? "0");
-  if (length > 100000) return NextResponse.json({error:"Payload too large"}, {status:413});
+  if (length > 1000000) return NextResponse.json({error:"Payload too large"}, {status:413});
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({error:"Invalid JSON"}, {status:400}); }
+  try { const raw = await req.text(); if (raw.length > 1000000) return NextResponse.json({error:"Payload too large"}, {status:413}); body = JSON.parse(raw); } catch { return NextResponse.json({error:"Invalid JSON"}, {status:400}); }
   if (!body || typeof body !== "object") return NextResponse.json({error:"Invalid snapshot"}, {status:400});
   const data = body as Record<string, unknown>;
   // The Python API returns null when a child has no sleep/feed document yet.
