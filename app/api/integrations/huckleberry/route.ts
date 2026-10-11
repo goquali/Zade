@@ -19,7 +19,28 @@ function authenticate(req: NextRequest) {
 // A successful check proves the runner and deployment tokens agree. No data or
 // secret fingerprints are returned, and no database query or write is performed.
 export async function GET(req: NextRequest) {
-  return authenticate(req) ?? NextResponse.json({ok:true}, {headers:syncHeaders});
+  const rejected = authenticate(req);
+  if (rejected) return rejected;
+  if (req.nextUrl.searchParams.get("verify") === "storage") {
+    const sql = neon(process.env.DATABASE_URL!);
+    try {
+      const rows = await sql`SELECT synced_at,
+        payload->>'source' AS source,
+        jsonb_typeof(payload->'sleep') AS sleep_type,
+        jsonb_typeof(payload->'nursing') AS nursing_type,
+        jsonb_typeof(payload->'growth') AS growth_type
+        FROM integration_snapshots WHERE provider='huckleberry' LIMIT 1`;
+      const row = rows[0];
+      return NextResponse.json({ok:true, stored:!!row,
+        syncedAt:row ? new Date(row.synced_at).toISOString() : null,
+        sourceVerified:row?.source === "huckleberry",
+        documents:row ? {sleep:row.sleep_type, nursing:row.nursing_type, growth:row.growth_type} : null
+      }, {headers:syncHeaders});
+    } catch {
+      return NextResponse.json({error:"Storage verification unavailable"}, {status:503, headers:syncHeaders});
+    }
+  }
+  return NextResponse.json({ok:true}, {headers:syncHeaders});
 }
 export async function POST(req: NextRequest) {
   const rejected = authenticate(req);
