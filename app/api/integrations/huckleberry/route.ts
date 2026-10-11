@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { timingSafeEqual } from "node:crypto";
+import { normalizeHuckleberry } from "../../../../lib/integrations/huckleberry-view";
 
 export const runtime = "nodejs";
 const syncHeaders = { "x-zade-auth-layer": "sync-token", "Cache-Control": "no-store" };
@@ -24,17 +25,22 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("verify") === "storage") {
     const sql = neon(process.env.DATABASE_URL!);
     try {
-      const rows = await sql`SELECT synced_at,
+      const rows = await sql`SELECT synced_at, payload,
         payload->>'source' AS source,
         jsonb_typeof(payload->'sleep') AS sleep_type,
         jsonb_typeof(payload->'nursing') AS nursing_type,
         jsonb_typeof(payload->'growth') AS growth_type
         FROM integration_snapshots WHERE provider='huckleberry' LIMIT 1`;
       const row = rows[0];
+      const view = row ? normalizeHuckleberry(row.payload) : null;
       return NextResponse.json({ok:true, stored:!!row,
         syncedAt:row ? new Date(row.synced_at).toISOString() : null,
         sourceVerified:row?.source === "huckleberry",
-        documents:row ? {sleep:row.sleep_type, nursing:row.nursing_type, growth:row.growth_type} : null
+        documents:row ? {sleep:row.sleep_type, nursing:row.nursing_type, growth:row.growth_type} : null,
+        displayAvailable:view ? {
+          sleep:!!view.sleep.startedAt, nursing:!!view.nursing.startedAt,
+          weight:!!view.growth.weight, height:!!view.growth.height, head:!!view.growth.head
+        } : null
       }, {headers:syncHeaders});
     } catch {
       return NextResponse.json({error:"Storage verification unavailable"}, {status:503, headers:syncHeaders});

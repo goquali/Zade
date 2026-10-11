@@ -6,7 +6,7 @@ const ts = require("typescript");
 const { NextRequest } = require("next/server");
 const { unstable_doesMiddlewareMatch: doesProxyMatch } = require("next/experimental/testing/server");
 
-function loadRoute(env) {
+function loadRoute(env, rows = []) {
   let queries = 0;
   const exports = {};
   const code = ts.transpileModule(
@@ -15,8 +15,16 @@ function loadRoute(env) {
   ).outputText;
   vm.runInNewContext(code, {
     exports, Buffer, process: { env },
-    require: (name) => name === "@neondatabase/serverless"
-      ? { neon: () => async () => { queries++; } } : require(name),
+    require: (name) => {
+      if (name === "@neondatabase/serverless") return { neon: () => async () => { queries++; return rows; } };
+      if (name.endsWith("huckleberry-view")) {
+        const result = {};
+        vm.runInNewContext(ts.transpileModule(fs.readFileSync("lib/integrations/huckleberry-view.ts", "utf8"),
+          {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText, {exports:result});
+        return result;
+      }
+      return require(name);
+    },
   });
   return { route: exports, queries: () => queries };
 }
@@ -69,6 +77,26 @@ test("missing configuration fails closed", async () => {
     assert.equal((await route.GET(request("GET", "Bearer " + token))).status, 503);
     assert.equal(queries(), 0);
   }
+});
+
+test("storage verification is authenticated, read-only and never returns record values", async () => {
+  const {route,queries} = loadRoute(env,[{synced_at:"2026-10-11T14:00:00Z", source:"huckleberry",
+    sleep_type:"object", nursing_type:"object", growth_type:"object",
+    payload:{childId:"private-fixture-id",sleep:{prefs:{lastSleep:{start:1791676800,duration:5400}}},growth:{weight:4.123,weightUnits:"kg"}}}]);
+  const req = authorization => new NextRequest("https://example.invalid/api/integrations/huckleberry?verify=storage",{headers:authorization?{authorization}:{}});
+  assert.equal((await route.GET(req())).status,401);
+  assert.equal(queries(),0);
+  const response=await route.GET(req("Bearer "+token));
+  const body=await response.json();
+  assert.equal(body.stored,true);
+  assert.equal(body.sourceVerified,true);
+  assert.equal(body.displayAvailable.sleep,true);
+  assert.equal(body.displayAvailable.nursing,false);
+  assert.equal(body.displayAvailable.weight,true);
+  assert.equal(JSON.stringify(body).includes("4.123"),false);
+  assert.equal(JSON.stringify(body).includes("private-fixture-id"),false);
+  assert.equal(queries(),1);
+  assert.equal(response.headers.get("cache-control"),"no-store");
 });
 
 test("valid snapshots support absent Huckleberry documents; malformed snapshots do not write", async () => {
