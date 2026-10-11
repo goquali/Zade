@@ -9,8 +9,9 @@ export default function DailyCare({todaysMl,todaysBottles,todaysDiapers,events,h
   const [editing,setEditing]=useState(false);
   const [today,setToday]=useState<string|null>(null);
   useEffect(()=>{
-    const formatter=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"});
-    setToday(formatter.format(new Date()));
+    const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+    const pick=(type:string)=>parts.find(p=>p.type===type)?.value??"";
+    setToday(pick("year")+"-"+pick("month")+"-"+pick("day"));
     const saved=window.localStorage.getItem("zade-daily-feeding-goal-ml");
     if(saved && Number(saved)>0 && Number(saved)<=2000){setGoal(Number(saved));setDraft(saved);}
   },[]);
