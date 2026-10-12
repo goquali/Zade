@@ -70,9 +70,25 @@ test("executive dashboard metrics use event history, projection math and stale d
   assert.equal(data.executive.milk.percent,"32%");
   assert.equal(data.executive.diaper.pee.state,"fresh");
   assert.equal(data.executive.diaper.poop.state,"fresh");
-  const stale = view.normalizeHuckleberry({...fixture, history:{...fixture.history, diaper:[{mode:"pee",start:1791716400},{mode:"poo",start:1791712800}]}}, fixedNow);
+  const stale = view.normalizeHuckleberry({...fixture, history:{...fixture.history, diaper:[{mode:"pee",start:1791676800},{mode:"poo",start:1791673200}]}}, fixedNow);
   assert.equal(stale.executive.diaper.pee.state,"stale");
   assert.equal(stale.executive.diaper.poop.state,"stale");
+});
+test("diaper flags use independent rolling 24-hour cutoffs and flag empty available history", () => {
+  const nowSeconds = fixedNow.getTime() / 1000;
+  const normalize = diaper => view.normalizeHuckleberry({...fixture,
+    history:{...fixture.history,diaper}}, fixedNow).executive.diaper;
+  const beforeCutoff = normalize([{mode:"pee",start:nowSeconds - 86400 + 1},
+    {mode:"poo",start:nowSeconds - 86400}]);
+  assert.equal(beforeCutoff.pee.state,"fresh");
+  assert.equal(beforeCutoff.poop.state,"stale");
+  const both = normalize([{mode:"both",start:nowSeconds - 12 * 3600}]);
+  assert.equal(both.pee.state,"fresh");
+  assert.equal(both.poop.state,"fresh");
+  const empty = normalize([]);
+  assert.equal(empty.pee.state,"stale");
+  assert.equal(empty.poop.state,"stale");
+  assert.equal(empty.pee.recordedAt,null);
 });
 test("missing event history is reported as unavailable instead of guessed from summaries", () => {
   const data = view.normalizeHuckleberry({...fixture, history:{feed:[],diaper:[]}}, fixedNow);
@@ -136,7 +152,7 @@ test("storage returns normalized data and database timestamp, with stale status"
 const Dashboard=load("app/components/huckleberry-dashboard.tsx",{"../../lib/integrations/huckleberry-view":view}).default;
 test("dashboard renders saved data and timestamp without sample totals or child IDs",()=>{
   const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture, fixedNow)}}));
-  for(const text of ["179 mL","32%","552 mL","Projected weight","Under 6 hours","Formula","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
+  for(const text of ["179 mL","32%","552 mL","Projected weight","Logged within 24 hours","Formula","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
   for(const text of ["510","15h 10m","Sample data","fixture-private-id"])assert.ok(!markup.includes(text));
 });
 test("dashboard renders missing measurements, empty storage, outage and stale warnings",()=>{

@@ -104,9 +104,9 @@ function executiveMetrics(payload: Document, now: Date) {
   const diaperStatus = (kind: "pee" | "poo") => {
     const latest = latestFor(kind);
     if (!events.diaperAvailable) return {state:"unknown" as const, recordedAt:null, age:null};
-    if (!latest?.recordedAt) return {state:"unknown" as const, recordedAt:null, age:null};
+    if (!latest?.recordedAt) return {state:"stale" as const, recordedAt:null, age:null};
     const ageMs = now.getTime() - Date.parse(latest.recordedAt);
-    return {state:ageMs > 6 * 60 * 60 * 1000 ? "stale" as const : "fresh" as const,
+    return {state:ageMs >= 24 * 60 * 60 * 1000 ? "stale" as const : "fresh" as const,
       recordedAt:latest.recordedAt, age:relativeDuration(ageMs)};
   };
   return {

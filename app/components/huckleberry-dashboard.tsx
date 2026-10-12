@@ -9,7 +9,7 @@ function TimerState({timer}: {timer: {state:string; startedAt:string | null}}) {
     {timer.startedAt && <small>Started <RecordedTime value={timer.startedAt}/></small>}</div>;
 }
 function DiaperMetric({label, item}: {label:string; item:{state:"fresh"|"stale"|"unknown"; recordedAt:string|null; age:string|null}}) {
-  const status = item.state === "fresh" ? "Under 6 hours" : item.state === "stale" ? "Over 6 hours" : "Unknown";
+  const status = item.state === "fresh" ? "Logged within 24 hours" : item.state === "stale" ? "No log in 24 hours" : "Unknown";
   return <article className={`metric diaper-${item.state}`}><div className="metricTop"><Droplets size={20}/><h3>{label}</h3></div>
     <strong>{status}</strong>
     {item.recordedAt ? <small>Last recorded <RecordedTime value={item.recordedAt}/>{item.age ? ` (${item.age} ago)` : ""}</small> :
