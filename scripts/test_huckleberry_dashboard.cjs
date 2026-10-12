@@ -150,9 +150,18 @@ test("storage returns normalized data and database timestamp, with stale status"
   assert.equal(JSON.stringify(result).includes("fixture-private-id"),false);
 });
 const Dashboard=load("app/components/huckleberry-dashboard.tsx",{"../../lib/integrations/huckleberry-view":view}).default;
+test("care lanes keep over-target intake visible while bounding visual meters",()=>{
+  const data=view.normalizeHuckleberry({...fixture,history:{...fixture.history,
+    feed:[{mode:"bottle",start:fixedNow.getTime()/1000 - 60,amount:1200,units:"ml"}]}},fixedNow);
+  assert.ok(data.executive.milk.percentValue > 100);
+  const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:fixedNow.toISOString(),stale:false,data}}));
+  assert.ok(markup.includes(`${data.executive.milk.percent} of tracking target`));
+  assert.ok(markup.includes('width:100%'));
+  assert.ok(markup.includes('Above tracking target'));
+});
 test("dashboard renders saved data and timestamp without sample totals or child IDs",()=>{
   const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture, fixedNow)}}));
-  for(const text of ["179 mL","32%","552 mL","Projected weight","Logged within 24 hours","Formula","4.2 kg","Last successful sync"])assert.ok(markup.includes(text));
+  for(const text of ["179 mL","32%","552 mL","Projected weight","Logged within 24 hours","Breast Milk","4.2 kg","Last successful sync"])assert.ok(markup.includes(text));
   for(const text of ["510","15h 10m","Sample data","fixture-private-id","Nursing","Timer at last sync"])assert.ok(!markup.includes(text));
 });
 test("dashboard renders missing measurements, empty storage, outage and stale warnings",()=>{

@@ -103,12 +103,14 @@ function executiveMetrics(payload: Document, now: Date) {
     entry.mode === kind || entry.mode === "both").at(-1) ?? null;
   const diaperStatus = (kind: "pee" | "poo") => {
     const latest = latestFor(kind);
-    if (!events.diaperAvailable) return {state:"unknown" as const, recordedAt:null, age:null};
-    if (!latest?.recordedAt) return {state:"stale" as const, recordedAt:null, age:null};
+    if (!events.diaperAvailable) return {state:"unknown" as const, recordedAt:null, age:null, ageHours:null};
+    if (!latest?.recordedAt) return {state:"stale" as const, recordedAt:null, age:null, ageHours:null};
     const ageMs = now.getTime() - Date.parse(latest.recordedAt);
     return {state:ageMs >= 24 * 60 * 60 * 1000 ? "stale" as const : "fresh" as const,
-      recordedAt:latest.recordedAt, age:relativeDuration(ageMs)};
+      recordedAt:latest.recordedAt, age:relativeDuration(ageMs), ageHours:Math.max(0, ageMs / 3600000)};
   };
+  const percentValue = events.feedAvailable && dailyTargetOz !== null && dailyTargetOz > 0
+    ? actualMl / (dailyTargetOz * ML_PER_OUNCE) * 100 : null;
   return {
     weight: {
       measuredAt,
@@ -121,8 +123,8 @@ function executiveMetrics(payload: Document, now: Date) {
       targetOz: dailyTargetOz === null ? null : displayOz(dailyTargetOz),
       targetMl: dailyTargetOz === null ? null : displayMl(dailyTargetOz * ML_PER_OUNCE),
       actualMl: events.feedAvailable ? displayMl(actualMl) : null,
-      percent: events.feedAvailable && dailyTargetOz && dailyTargetOz > 0
-        ? `${Math.round(actualMl / (dailyTargetOz * ML_PER_OUNCE) * 100)}%` : null,
+      percentValue,
+      percent: percentValue === null ? null : `${Math.round(percentValue)}%`,
       bottleCount: events.feedAvailable ? rollingBottles.length : null,
       latest: latestBottle,
       timeSinceLatest: latestBottle?.recordedAt ? relativeDuration(now.getTime() - Date.parse(latestBottle.recordedAt)) : null,
