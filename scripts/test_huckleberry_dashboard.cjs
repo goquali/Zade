@@ -152,8 +152,8 @@ test("storage returns normalized data and database timestamp, with stale status"
 const Dashboard=load("app/components/huckleberry-dashboard.tsx",{"../../lib/integrations/huckleberry-view":view}).default;
 test("dashboard renders saved data and timestamp without sample totals or child IDs",()=>{
   const markup=renderToStaticMarkup(React.createElement(Dashboard,{snapshot:{state:"ready",syncedAt:"2026-10-11T14:00:00Z",stale:false,data:view.normalizeHuckleberry(fixture, fixedNow)}}));
-  for(const text of ["179 mL","32%","552 mL","Projected weight","Logged within 24 hours","Formula","12 min","4.2 kg","Last successful sync","Timer at last sync"])assert.ok(markup.includes(text));
-  for(const text of ["510","15h 10m","Sample data","fixture-private-id"])assert.ok(!markup.includes(text));
+  for(const text of ["179 mL","32%","552 mL","Projected weight","Logged within 24 hours","Formula","4.2 kg","Last successful sync"])assert.ok(markup.includes(text));
+  for(const text of ["510","15h 10m","Sample data","fixture-private-id","Nursing","Timer at last sync"])assert.ok(!markup.includes(text));
 });
 test("dashboard renders missing measurements, empty storage, outage and stale warnings",()=>{
   const render=snapshot=>renderToStaticMarkup(React.createElement(Dashboard,{snapshot}));
@@ -161,7 +161,7 @@ test("dashboard renders missing measurements, empty storage, outage and stale wa
   assert.match(render({state:"unavailable"}),/Care data unavailable/);
   const html=render({state:"ready",syncedAt:"2020-01-01T00:00:00Z",stale:true,data:view.normalizeHuckleberry(null)});
   assert.match(html,/Bottle history is unavailable/);
-  assert.match(html,/No completed nursing record available/);
+  assert.doesNotMatch(html,/Nursing|nursing record|Timer at last sync/);
   assert.match(html,/No bottle summary available/);
   assert.match(html,/Not recorded/);
   assert.match(html,/over an hour old/);

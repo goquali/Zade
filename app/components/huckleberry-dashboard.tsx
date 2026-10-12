@@ -4,10 +4,6 @@ import { formatRecordedTime, type HuckleberryDashboard } from "../../lib/integra
 function RecordedTime({value}: {value: string | null}) {
   return value ? <time dateTime={value}>{formatRecordedTime(value)}</time> : <>Time not recorded</>;
 }
-function TimerState({timer}: {timer: {state:string; startedAt:string | null}}) {
-  return <div className="timer-state"><span>Timer at last sync</span><strong>{timer.state}</strong>
-    {timer.startedAt && <small>Started <RecordedTime value={timer.startedAt}/></small>}</div>;
-}
 function DiaperMetric({label, item}: {label:string; item:{state:"fresh"|"stale"|"unknown"; recordedAt:string|null; age:string|null}}) {
   const status = item.state === "fresh" ? "Logged within 24 hours" : item.state === "stale" ? "No log in 24 hours" : "Unknown";
   return <article className={`metric diaper-${item.state}`}><div className="metricTop"><Droplets size={20}/><h3>{label}</h3></div>
@@ -57,12 +53,6 @@ export default function HuckleberryDashboard({snapshot}: {snapshot:HuckleberryDa
           {data.bottle.recordedAt ? <><p className="entry-label">Last summary bottle feed</p><strong>{data.bottle.amount ?? "Amount not recorded"}</strong>
             <small>Recorded <RecordedTime value={data.bottle.recordedAt}/></small>
             <dl className="details"><div><dt>Milk type</dt><dd>{data.bottle.type ?? "Not recorded"}</dd></div></dl></> : <p className="empty">No bottle summary available.</p>}
-        </article>
-        <article className="metric"><div className="metricTop"><Baby size={20}/><h3>Nursing</h3></div>
-          {data.nursing.startedAt ? <><p className="entry-label">Last recorded nursing session</p><strong>{data.nursing.duration ?? "Duration not recorded"}</strong>
-            <small>Started <RecordedTime value={data.nursing.startedAt}/></small>
-            <dl className="details"><div><dt>Left</dt><dd>{data.nursing.left ?? "Not recorded"}</dd></div><div><dt>Right</dt><dd>{data.nursing.right ?? "Not recorded"}</dd></div></dl></> : <p className="empty">No completed nursing record available.</p>}
-          <TimerState timer={data.nursing.timer}/>
         </article>
       </div>
     </section>
