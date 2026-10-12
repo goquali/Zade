@@ -1,0 +1,2 @@
+huckleberry-api==0.4.7
+aiohttp==3.13.5
